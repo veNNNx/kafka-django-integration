@@ -1,54 +1,30 @@
-import faust
-import requests
-app = faust.App('event_receiver',broker="kafka://kafka:9092")
+import pika
+import json
+import os
+import time
 
-class Event(faust.Record,validation=True):
-    name: str
-    source: str
-    description: str
+time.sleep(10)
 
-topic = app.topic("events",value_type=Event)
+params = pika.ConnectionParameters('host.docker.internal')
 
-@app.agent(topic)
-async def receiver(events):
-    async for e in events:
-        print(f"Data recieved is {e}")
-        data = {'name': e.name, 'source': e.source, 'description': e.description}
-        try:
-            requests.post("http://django-api:8000/endpoint", data=data)
-        except Exception as e:
-            print('Error:', e)
+connection = pika.BlockingConnection(params)
 
-if __name__ == '__main__':
-    app.main()
+channel = connection.channel()
+
+channel.queue_declare(queue='admin')
 
 
-# Kafka consumer
+def callback(ch, method, properties, body):
+    print('Received in admin')
+    id = json.loads(body)
+    print('Consumer recived:', id)
 
-# to requirementas:
-# kafka-python==1.4.7
-# robinhood-aiokafka==1.1.6
 
+channel.basic_consume(
+    queue='admin', on_message_callback=callback, auto_ack=True)
 
-# from kafka import KafkaConsumer
-# import time
-# import json
-# def consume():
-#     consumer = KafkaConsumer('events', bootstrap_servers='kafka:9092')
-#     print('Created consumer\ntopic: events\nbootstrap_servers: kafka:9092')
-#     while True:
-#         for message in consumer:
-#             event = json.loads(message.value)
-#             print(event)
-#             try:
-#                 requests.post("http://django-api:8000/endpoint", data=event)
-#                 print(f'[Consumer] Send event!\n{event}')
-#             except Exception as e:
-#                 print('Error:', e)
+print('Started Consuming')
 
-# if __name__ == "__main__":
-#     while True:
-#         try:
-#             consume()
-#         except Exception as e:
-#             print('ERROR!!')
+channel.start_consuming()
+
+channel.close()

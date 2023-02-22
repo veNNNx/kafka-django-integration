@@ -4,20 +4,20 @@ services:
     image: postgres
     container_name: postgres
     volumes:
-      - ./django/data/db:/var/lib/postgresql/data
+      - ./django_web/data/db:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     ports:
       - "5432:5432"
-  
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: pgadmin4
     restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL:  admin@admin.com
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
       - "5050:80"
@@ -25,10 +25,11 @@ services:
       - db
 
   web:
-    build: 
-      context: ./django
-      dockerfile: .
+    build:
+      context: ./django_web
+      dockerfile: Dockerfile
     container_name: django-api
+    restart: always
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - .:/code
@@ -40,45 +41,27 @@ services:
       - POSTGRES_PASSWORD=postgres
     depends_on:
       - db
-  
-  zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    container_name: zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - 22181:2181
-  
-  kafka:
-    image: confluentinc/cp-kafka:5.3.1
-    container_name: kafka
-    depends_on:
-      - zookeeper
-    ports:
-      - 29092:29092
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-
-  producer:
-    build:
-      context: ./producer
-      dockerfile: .
-    container_name: producer-api
-    command: python producer.py
-    depends_on:
-      - kafka
 
   consumer:
     build:
       context: ./consumer
-      dockerfile: .
-    container_name: consumer-api
-    command: python consumer.py worker -l info
+      dockerfile: Dockerfile
+    container_name: consumer
+    restart: always
     depends_on:
-      - kafka
+      - rabbitmq
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: 'rabbitmq'
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
+      - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+    networks:
+      - rabbitmq_go_net
+networks:
+  rabbitmq_go_net:
+    driver: bridge

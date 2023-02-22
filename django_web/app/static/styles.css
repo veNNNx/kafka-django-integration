@@ -1,0 +1,13 @@
+.navbar {
+  margin: auto;
+  background-color: darkgrey;
+  padding: 10px;
+  font-size: 25px;
+}
+
+.content{
+  border: 1px solid;
+  margin: auto;
+  width: 75%;
+  padding: 10px;
+}
